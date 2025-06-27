@@ -1,7 +1,7 @@
 # ---- PyTorch CPU wheel (tidak menarik paket CUDA) ----
---index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.1+cpu
-torchvision==0.17.1+cpu      # perlu kalau Ultralytics memanggil torchvision
+torchvision==0.17.1+cpu
 
 # ---- Core app ----
 flask
@@ -12,11 +12,10 @@ pymongo
 bson
 pillow
 python-dateutil
-opencv-python-headless        # jauh lebih kecil daripada opencv-python
+opencv-python-headless
 
-# ---- Ultralytics  -----------------------------------
-ultralytics==8.3.160          # biarkan versi yg km butuh
-# (ultralytics-thop biasanya ikut otomatis; kalau tidak diperlukan hapus)
+# ---- Ultralytics -------------------------------------
+ultralytics==8.3.160
 
 # ---- Production server ----
 gunicorn
