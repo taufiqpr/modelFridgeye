@@ -3,6 +3,8 @@ from flask_cors import CORS
 from ultralytics import YOLO
 from pymongo import MongoClient
 from bson import ObjectId
+import requests
+from pathlib import Path
 import os
 import uuid
 from zoneinfo import ZoneInfo 
@@ -29,6 +31,72 @@ client = MongoClient(MONGO_URI)
 db = client["predict"]
 fruits_collection = db["fruits"]
 
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+MODEL_URL = "https://drive.google.com/uc?export=download&id=1fABCdefGhIjKlmn"
+model_path = Path("best.pt")
+
+if not model_path.exists():
+    print("⬇️ Mengunduh model YOLO...")
+    r = requests.get(MODEL_URL, stream=True)
+    with open(model_path, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+    print("✅ Unduhan selesai")
+
+# Load model
+from ultralytics import YOLO
+model = YOLO(str(model_path))
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    print("Menerima permintaan dari Flutter...")
+
+    if 'image' not in request.files:
+        print("❌ Tidak ada gambar ditemukan.")
+        return jsonify({"error": "No image uploaded"}), 400
+
+    image = request.files['image']
+    filename = f"{uuid.uuid4()}.jpg"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    image.save(filepath)
+    print(f"📂 Gambar disimpan: {filepath}")
+
+    try:
+        results = model.predict(source=filepath, conf=0.3)
+
+        pred = results[0]
+        boxes = pred.boxes
+        names = model.names
+
+        detected_objects = []
+        for box in boxes:
+            cls_id = int(box.cls[0])
+            confidence = float(box.conf[0])
+            bbox = box.xyxy[0].tolist()  
+
+            detected_objects.append({
+                "class": names[cls_id],
+                "confidence": round(confidence, 2),
+                "bbox": [round(x, 2) for x in bbox]
+            })
+
+        print(f"Deteksi selesai: {len(detected_objects)} objek ditemukan.")
+
+        return jsonify({
+            "message": "Prediction success",
+            "detections": detected_objects
+        })
+
+    except Exception as e:
+        print(f"Error saat prediksi: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.route('/fruits', methods=['POST'])
 @jwt_required()
