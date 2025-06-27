@@ -5,10 +5,16 @@ from pymongo import MongoClient
 from bson import ObjectId
 import os
 import uuid
+from zoneinfo import ZoneInfo 
 from datetime import datetime, timedelta
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 
 app = Flask(__name__)
 CORS(app)
+
+app.config['JWT_SECRET_KEY'] = 'fridgeeye'
+app.config['JWT_LEEWAY'] = timedelta(seconds=120)
+jwt = JWTManager(app)
 
 SHELF_LIFE = {
     'apel': 6,
@@ -30,7 +36,7 @@ model = YOLO("best.pt")
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    print("📥 Menerima permintaan dari Flutter...")
+    print("Menerima permintaan dari Flutter...")
 
     if 'image' not in request.files:
         print("❌ Tidak ada gambar ditemukan.")
@@ -61,7 +67,7 @@ def predict():
                 "bbox": [round(x, 2) for x in bbox]
             })
 
-        print(f"✅ Deteksi selesai: {len(detected_objects)} objek ditemukan.")
+        print(f"Deteksi selesai: {len(detected_objects)} objek ditemukan.")
 
         return jsonify({
             "message": "Prediction success",
@@ -69,7 +75,7 @@ def predict():
         })
 
     except Exception as e:
-        print(f"❌ Error saat prediksi: {e}")
+        print(f"Error saat prediksi: {e}")
         return jsonify({"error": str(e)}), 500
 
     finally:
@@ -77,8 +83,11 @@ def predict():
             os.remove(filepath)
 
 @app.route('/fruits', methods=['POST'])
+@jwt_required()
 def add_fruit():
+    current_user = get_jwt_identity()
     data = request.get_json()
+
     name = data.get('name', '').lower()
     image = data.get('image')
     purchase_date_str = data.get('purchaseDate')
@@ -87,44 +96,53 @@ def add_fruit():
         return jsonify({'error': 'Nama dan tanggal pembelian wajib diisi'}), 400
 
     try:
-        purchase_date = datetime.fromisoformat(purchase_date_str)
+        purchase_date = datetime.fromisoformat(purchase_date_str).replace(tzinfo=ZoneInfo("Asia/Jakarta"))  # ✅ WIB
     except Exception:
         return jsonify({'error': 'Format tanggal tidak valid'}), 400
 
-    life = SHELF_LIFE.get(name, 5)  
+    life = SHELF_LIFE.get(name, 5)
     expiry_date = purchase_date + timedelta(days=life)
 
     fruit = {
+        'user_email': current_user,
         'name': name,
         'image': image,
         'purchaseDate': purchase_date.isoformat(),
         'expiryDate': expiry_date.isoformat()
     }
 
-    result = fruits_collection.insert_one(fruit)
+    fruits_collection.insert_one(fruit)
     return jsonify({'message': 'Buah berhasil ditambahkan'}), 201
 
 @app.route('/fruits', methods=['GET'])
+@jwt_required()
 def get_fruits():
-    all_fruits = list(fruits_collection.find())
+    current_user = get_jwt_identity()
 
-    for buah in all_fruits:
+    fruits = fruits_collection.find({'user_email': current_user})
+    all_fruits = []
+
+    for buah in fruits:
         buah['_id'] = str(buah['_id'])
         buah['purchaseDate'] = str(buah['purchaseDate'])
         buah['expiryDate'] = str(buah['expiryDate'])
+        all_fruits.append(buah)
 
     return jsonify(all_fruits), 200
 
-
 @app.route('/notifications', methods=['GET'])
+@jwt_required()
 def get_notifications():
-    now = datetime.now()
+    current_user = get_jwt_identity()
+    now = datetime.now(ZoneInfo("Asia/Jakarta")) 
 
     busuk = fruits_collection.find({
+        'user_email': current_user,
         'expiryDate': {'$lt': now.isoformat()}
     })
 
     hampir_busuk = fruits_collection.find({
+        'user_email': current_user,
         'expiryDate': {
             '$gte': now.isoformat(),
             '$lte': (now + timedelta(days=2)).isoformat()
@@ -137,7 +155,6 @@ def get_notifications():
     }
 
     return jsonify(notif), 200
-
 
 if __name__ == '__main__':
     app.run(debug=False, host="0.0.0.0", port=5000)
