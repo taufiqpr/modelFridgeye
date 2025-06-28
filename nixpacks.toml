@@ -1,2 +1,5 @@
 [phases.setup]
-nixPkgs = ["libGL"]
+nixPkgs = ["libGL", "python312", "pip"]
+
+[start]
+cmd = "gunicorn app:app"
