@@ -3,8 +3,6 @@ from flask_cors import CORS
 from ultralytics import YOLO
 from pymongo import MongoClient
 from bson import ObjectId
-import requests
-from pathlib import Path
 import os
 import uuid
 from zoneinfo import ZoneInfo 
@@ -34,21 +32,7 @@ fruits_collection = db["fruits"]
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-MODEL_URL = "https://drive.google.com/uc?export=download&id=1fABCdefGhIjKlmn"
-model_path = Path("best.pt")
-
-if not model_path.exists():
-    print("⬇️ Mengunduh model YOLO...")
-    r = requests.get(MODEL_URL, stream=True)
-    with open(model_path, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=8192):
-            if chunk:
-                f.write(chunk)
-    print("✅ Unduhan selesai")
-
-# Load model
-from ultralytics import YOLO
-model = YOLO(str(model_path))
+model = YOLO("best.pt")
 
 @app.route('/predict', methods=['POST'])
 def predict():

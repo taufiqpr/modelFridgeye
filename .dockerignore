@@ -1,9 +1,0 @@
-__pycache__/
-*.pt
-*.h5
-*.pkl
-*.zip
-uploads/
-.env
-venv/
-.git/
