@@ -24,7 +24,7 @@ SHELF_LIFE = {
     'semangka': 1
 }
 
-MONGO_URI = "mongodb://localhost:27017"
+MONGO_URI = os.environ.get("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["predict"]
 fruits_collection = db["fruits"]
@@ -159,3 +159,4 @@ def get_notifications():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
