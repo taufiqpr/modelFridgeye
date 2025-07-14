@@ -156,6 +156,26 @@ def predict():
         if os.path.exists(filepath):
             os.remove(filepath)
 
+@app.route('/history', methods=['GET'])
+@jwt_required()
+def get_history():
+    current_user = get_jwt_identity()
+    
+    # Ambil semua history berdasarkan email user yang sedang login
+    history_cursor = db["history"].find({'user_email': current_user}).sort('timestamp', -1)
+    
+    history_list = []
+    for item in history_cursor:
+        history_list.append({
+            "_id": str(item.get('_id')),
+            "user_email": item.get('user_email'),
+            "timestamp": item.get('timestamp'),
+            "filename": item.get('filename'),
+            "detections": item.get('detections', [])
+        })
+
+    return jsonify(history_list), 200
+
 
 @app.route('/fruits', methods=['POST'])
 @jwt_required()
