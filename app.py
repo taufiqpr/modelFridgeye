@@ -177,6 +177,12 @@ def get_history():
 
     return jsonify(history_list), 200
 
+from flask import send_from_directory
+
+@app.route('/uploads/<filename>')
+def serve_image(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
 
 @app.route('/fruits', methods=['POST'])
 @jwt_required()
