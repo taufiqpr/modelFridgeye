@@ -153,9 +153,6 @@ def predict():
         print(f"❌ Error saat prediksi: {e}")
         return jsonify({"error": str(e)}), 500
 
-    finally:
-        if os.path.exists(filepath):
-            os.remove(filepath)
 
 @app.route('/history', methods=['GET'])
 @jwt_required()
@@ -180,7 +177,7 @@ def get_history():
 from flask import send_from_directory
 
 @app.route('/uploads/<filename>')
-def serve_image(filename):
+def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
