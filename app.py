@@ -92,6 +92,8 @@ MONGO_URI = os.environ.get("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["predict"]
 fruits_collection = db["fruits"]
+history_collection = db["detection_history"]
+
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -99,22 +101,22 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 model = YOLO("best.pt")
 
 @app.route('/predict', methods=['POST'])
+@jwt_required(optional=True)  # Boleh dengan atau tanpa login
 def predict():
     print("Menerima permintaan dari Flutter...")
 
+    current_user = get_jwt_identity()
+
     if 'image' not in request.files:
-        print("❌ Tidak ada gambar ditemukan.")
         return jsonify({"error": "No image uploaded"}), 400
 
     image = request.files['image']
     filename = f"{uuid.uuid4()}.jpg"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     image.save(filepath)
-    print(f"📂 Gambar disimpan: {filepath}")
 
     try:
         results = model.predict(source=filepath, conf=0.3)
-
         pred = results[0]
         boxes = pred.boxes
         names = model.names
@@ -123,7 +125,7 @@ def predict():
         for box in boxes:
             cls_id = int(box.cls[0])
             confidence = float(box.conf[0])
-            bbox = box.xyxy[0].tolist()  
+            bbox = box.xyxy[0].tolist()
 
             detected_objects.append({
                 "class": names[cls_id],
@@ -131,7 +133,14 @@ def predict():
                 "bbox": [round(x, 2) for x in bbox]
             })
 
-        print(f"Deteksi selesai: {len(detected_objects)} objek ditemukan.")
+        # ✅ Simpan ke history
+        if current_user:
+            history_collection.insert_one({
+                'user_email': current_user,
+                'timestamp': datetime.now(ZoneInfo("Asia/Jakarta")).isoformat(),
+                'filename': filename,
+                'detections': detected_objects
+            })
 
         return jsonify({
             "message": "Prediction success",
@@ -139,12 +148,30 @@ def predict():
         })
 
     except Exception as e:
-        print(f"Error saat prediksi: {e}")
         return jsonify({"error": str(e)}), 500
 
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
+
+@app.route('/detection-history', methods=['GET'])
+@jwt_required()
+def get_detection_history():
+    current_user = get_jwt_identity()
+
+    history = history_collection.find({'user_email': current_user}).sort('timestamp', -1)
+    result = []
+
+    for h in history:
+        result.append({
+            '_id': str(h['_id']),
+            'timestamp': h['timestamp'],
+            'filename': h.get('filename', ''),
+            'detections': h['detections']
+        })
+
+    return jsonify(result), 200
+
 
 @app.route('/fruits', methods=['POST'])
 @jwt_required()
