@@ -101,7 +101,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 model = YOLO("best.pt")
 
 @app.route('/predict', methods=['POST'])
-@jwt_required(optional=True)  # Boleh dengan atau tanpa login
+@jwt_required()  # Boleh dengan atau tanpa login
 def predict():
     print("Menerima permintaan dari Flutter...")
 
