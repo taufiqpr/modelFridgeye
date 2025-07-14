@@ -92,6 +92,7 @@ MONGO_URI = os.environ.get("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["predict"]
 fruits_collection = db["fruits"]
+history_collection = db["history"]
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -134,9 +135,9 @@ def predict():
 
         print(f"✅ Deteksi selesai: {len(detected_objects)} objek ditemukan.")
 
-        # ✅ Simpan history
+        # ✅ Simpan history menggunakan variabel collection
         if current_user:
-            db["history"].insert_one({
+            history_collection.insert_one({
                 'user_email': current_user,
                 'timestamp': datetime.now(ZoneInfo("Asia/Jakarta")).isoformat(),
                 'filename': filename,
@@ -161,8 +162,8 @@ def predict():
 def get_history():
     current_user = get_jwt_identity()
     
-    # Ambil semua history berdasarkan email user yang sedang login
-    history_cursor = db["history"].find({'user_email': current_user}).sort('timestamp', -1)
+    # Gunakan variabel history_collection
+    history_cursor = history_collection.find({'user_email': current_user}).sort('timestamp', -1)
     
     history_list = []
     for item in history_cursor:
