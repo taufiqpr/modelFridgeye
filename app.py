@@ -99,8 +99,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 model = YOLO("best.pt")
 
 @app.route('/predict', methods=['POST'])
+@jwt_required()
 def predict():
     print("Menerima permintaan dari Flutter...")
+    current_user = get_jwt_identity()
 
     if 'image' not in request.files:
         print("❌ Tidak ada gambar ditemukan.")
@@ -114,7 +116,6 @@ def predict():
 
     try:
         results = model.predict(source=filepath, conf=0.3)
-
         pred = results[0]
         boxes = pred.boxes
         names = model.names
@@ -123,7 +124,7 @@ def predict():
         for box in boxes:
             cls_id = int(box.cls[0])
             confidence = float(box.conf[0])
-            bbox = box.xyxy[0].tolist()  
+            bbox = box.xyxy[0].tolist()
 
             detected_objects.append({
                 "class": names[cls_id],
@@ -131,7 +132,16 @@ def predict():
                 "bbox": [round(x, 2) for x in bbox]
             })
 
-        print(f"Deteksi selesai: {len(detected_objects)} objek ditemukan.")
+        print(f"✅ Deteksi selesai: {len(detected_objects)} objek ditemukan.")
+
+        # ✅ Simpan history
+        if current_user:
+            db["history"].insert_one({
+                'user_email': current_user,
+                'timestamp': datetime.now(ZoneInfo("Asia/Jakarta")).isoformat(),
+                'filename': filename,
+                'detections': detected_objects
+            })
 
         return jsonify({
             "message": "Prediction success",
@@ -139,12 +149,13 @@ def predict():
         })
 
     except Exception as e:
-        print(f"Error saat prediksi: {e}")
+        print(f"❌ Error saat prediksi: {e}")
         return jsonify({"error": str(e)}), 500
 
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
+
 
 @app.route('/fruits', methods=['POST'])
 @jwt_required()
